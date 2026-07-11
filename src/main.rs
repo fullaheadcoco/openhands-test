@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     fs,
     io::{self, stdout},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 const SAVE_FILE: &str = "todos.json";
@@ -23,6 +24,33 @@ enum Priority {
     High,
     Medium,
     Low,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+enum SortMode {
+    Priority,
+    Newest,
+    Oldest,
+    Alpha,
+}
+
+impl SortMode {
+    fn next(&self) -> Self {
+        match self {
+            SortMode::Priority => SortMode::Newest,
+            SortMode::Newest => SortMode::Oldest,
+            SortMode::Oldest => SortMode::Alpha,
+            SortMode::Alpha => SortMode::Priority,
+        }
+    }
+    fn label(&self) -> &str {
+        match self {
+            SortMode::Priority => "PRI",
+            SortMode::Newest => "NEW",
+            SortMode::Oldest => "OLD",
+            SortMode::Alpha => "A-Z",
+        }
+    }
 }
 
 impl Priority {
@@ -54,6 +82,22 @@ struct Todo {
     text: String,
     done: bool,
     priority: Priority,
+    #[serde(default = "default_created_at")]
+    created_at: u64,
+}
+
+fn default_created_at() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+}
+
+fn now_secs() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -90,6 +134,7 @@ struct App {
     input_mode: InputMode,
     search_query: String,
     filtered_indices: Vec<usize>,
+    sort_mode: SortMode,
     should_quit: bool,
 }
 
@@ -101,15 +146,21 @@ impl App {
             list_state.select(Some(0));
         }
         let filtered_indices: Vec<usize> = (0..todos.items.len()).collect();
-        App {
+        let mut app = App {
             todos,
             list_state,
             input: String::new(),
             input_mode: InputMode::Normal,
             search_query: String::new(),
             filtered_indices,
+            sort_mode: SortMode::Newest,
             should_quit: false,
+        };
+        app.sort_filtered();
+        if !app.filtered_indices.is_empty() {
+            app.list_state.select(Some(0));
         }
+        app
     }
 
     fn save(&self) {
@@ -123,6 +174,7 @@ impl App {
                 text,
                 done: false,
                 priority: Priority::Medium,
+                created_at: now_secs(),
             });
             self.refresh_filter();
             self.list_state.select(Some(self.filtered_indices.len().saturating_sub(1)));
@@ -188,6 +240,41 @@ impl App {
             .filter(|(_, t)| t.text.to_lowercase().contains(&q))
             .map(|(i, _)| i)
             .collect();
+        self.sort_filtered();
+    }
+
+    fn sort_filtered(&mut self) {
+        match self.sort_mode {
+            SortMode::Priority => {
+                self.filtered_indices.sort_by_key(|&i| {
+                    match self.todos.items[i].priority {
+                        Priority::High => 0,
+                        Priority::Medium => 1,
+                        Priority::Low => 2,
+                    }
+                });
+            }
+            SortMode::Newest => {
+                self.filtered_indices
+                    .sort_by(|&a, &b| self.todos.items[b].created_at.cmp(&self.todos.items[a].created_at));
+            }
+            SortMode::Oldest => {
+                self.filtered_indices
+                    .sort_by(|&a, &b| self.todos.items[a].created_at.cmp(&self.todos.items[b].created_at));
+            }
+            SortMode::Alpha => {
+                self.filtered_indices
+                    .sort_by(|&a, &b| self.todos.items[a].text.to_lowercase().cmp(&self.todos.items[b].text.to_lowercase()));
+            }
+        }
+    }
+
+    fn cycle_sort(&mut self) {
+        self.sort_mode = self.sort_mode.next();
+        self.sort_filtered();
+        if !self.filtered_indices.is_empty() {
+            self.list_state.select(Some(0));
+        }
     }
 
     fn apply_search(&mut self) {
@@ -262,6 +349,7 @@ fn handle_key(key: KeyCode, app: &mut App) {
                 app.input_mode = InputMode::Searching;
                 app.input.clear();
             }
+            KeyCode::Char('s') => app.cycle_sort(),
             KeyCode::Char('l') => {
                 // Ctrl+L: clear search
                 app.search_query.clear();
@@ -331,24 +419,30 @@ fn ui(f: &mut Frame, app: &App) {
         Line::from(vec![
             Span::styled("📋 Rust TODO", Style::new().bold().fg(Color::Cyan)),
             Span::raw(" | "),
+            Span::styled(app.sort_mode.label(), Style::new().fg(Color::Blue)),
+            Span::raw(" | "),
             Span::styled("n", Style::new().fg(Color::Yellow)),
             Span::raw(":add "),
             Span::styled("e", Style::new().fg(Color::Yellow)),
             Span::raw(":edit "),
             Span::styled("d", Style::new().fg(Color::Yellow)),
             Span::raw(":del "),
+            Span::styled("s", Style::new().fg(Color::Yellow)),
+            Span::raw(":sort "),
             Span::styled("\u{2423}", Style::new().fg(Color::Yellow)),
             Span::raw(":done "),
             Span::styled("p", Style::new().fg(Color::Yellow)),
-            Span::raw(":priority "),
+            Span::raw(":pri "),
             Span::styled("/", Style::new().fg(Color::Yellow)),
-            Span::raw(":search "),
+            Span::raw(":find "),
             Span::styled("q", Style::new().fg(Color::Yellow)),
             Span::raw(":quit"),
         ])
     } else {
         Line::from(vec![
             Span::styled("📋 Rust TODO", Style::new().bold().fg(Color::Cyan)),
+            Span::raw(" | "),
+            Span::styled(app.sort_mode.label(), Style::new().fg(Color::Blue)),
             Span::raw(" | 🔍 "),
             Span::styled(&app.search_query, Style::new().fg(Color::Magenta)),
             Span::raw(" | "),

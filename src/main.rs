@@ -177,7 +177,8 @@ impl App {
                 created_at: now_secs(),
             });
             self.refresh_filter();
-            self.list_state.select(Some(self.filtered_indices.len().saturating_sub(1)));
+            self.list_state
+                .select(Some(self.filtered_indices.len().saturating_sub(1)));
             self.save();
         }
         self.input.clear();
@@ -246,25 +247,34 @@ impl App {
     fn sort_filtered(&mut self) {
         match self.sort_mode {
             SortMode::Priority => {
-                self.filtered_indices.sort_by_key(|&i| {
-                    match self.todos.items[i].priority {
+                self.filtered_indices
+                    .sort_by_key(|&i| match self.todos.items[i].priority {
                         Priority::High => 0,
                         Priority::Medium => 1,
                         Priority::Low => 2,
-                    }
-                });
+                    });
             }
             SortMode::Newest => {
-                self.filtered_indices
-                    .sort_by(|&a, &b| self.todos.items[b].created_at.cmp(&self.todos.items[a].created_at));
+                self.filtered_indices.sort_by(|&a, &b| {
+                    self.todos.items[b]
+                        .created_at
+                        .cmp(&self.todos.items[a].created_at)
+                });
             }
             SortMode::Oldest => {
-                self.filtered_indices
-                    .sort_by(|&a, &b| self.todos.items[a].created_at.cmp(&self.todos.items[b].created_at));
+                self.filtered_indices.sort_by(|&a, &b| {
+                    self.todos.items[a]
+                        .created_at
+                        .cmp(&self.todos.items[b].created_at)
+                });
             }
             SortMode::Alpha => {
-                self.filtered_indices
-                    .sort_by(|&a, &b| self.todos.items[a].text.to_lowercase().cmp(&self.todos.items[b].text.to_lowercase()));
+                self.filtered_indices.sort_by(|&a, &b| {
+                    self.todos.items[a]
+                        .text
+                        .to_lowercase()
+                        .cmp(&self.todos.items[b].text.to_lowercase())
+                });
             }
         }
     }
@@ -295,7 +305,8 @@ impl App {
             return;
         }
         let current = self.list_state.selected().unwrap_or(0);
-        let new = (current as i32 + delta).clamp(0, self.filtered_indices.len() as i32 - 1) as usize;
+        let new =
+            (current as i32 + delta).clamp(0, self.filtered_indices.len() as i32 - 1) as usize;
         self.list_state.select(Some(new));
     }
 }
@@ -483,8 +494,10 @@ fn ui(f: &mut Frame, app: &App) {
                     Style::new().fg(Color::White),
                 )
             };
-            let priority_label =
-                Span::styled(todo.priority.label(), Style::new().fg(todo.priority.color()));
+            let priority_label = Span::styled(
+                todo.priority.label(),
+                Style::new().fg(todo.priority.color()),
+            );
             Line::from(vec![priority_label, Span::raw(" "), text])
         })
         .map(ListItem::new)
@@ -520,8 +533,7 @@ fn ui(f: &mut Frame, app: &App) {
             } else {
                 String::new()
             };
-            let footer =
-                Paragraph::new(status).block(Block::bordered().title(" Status ").dim());
+            let footer = Paragraph::new(status).block(Block::bordered().title(" Status ").dim());
             f.render_widget(footer, chunks[2]);
         }
         InputMode::Adding => {

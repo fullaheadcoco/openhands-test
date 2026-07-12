@@ -544,3 +544,70 @@ fn ui(f: &mut Frame, app: &App) {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_todo_creation() {
+        let todo = Todo {
+            text: "Test todo".to_string(),
+            done: false,
+            priority: Priority::Medium,
+            created_at: 1000,
+        };
+        assert_eq!(todo.text, "Test todo");
+        assert!(!todo.done);
+        assert!(matches!(todo.priority, Priority::Medium));
+        assert_eq!(todo.created_at, 1000);
+    }
+
+    #[test]
+    fn test_priority_cycle() {
+        assert!(matches!(Priority::Low.next(), Priority::Medium));
+        assert!(matches!(Priority::Medium.next(), Priority::High));
+        assert!(matches!(Priority::High.next(), Priority::Low));
+    }
+
+    #[test]
+    fn test_toggle_done() {
+        let mut todo = Todo {
+            text: "Test".to_string(),
+            done: false,
+            priority: Priority::Low,
+            created_at: 0,
+        };
+        assert!(!todo.done);
+        todo.done = !todo.done;
+        assert!(todo.done);
+        todo.done = !todo.done;
+        assert!(!todo.done);
+    }
+
+    #[test]
+    fn test_add_remove_from_list() {
+        let mut list = TodoList { items: vec![] };
+        assert!(list.items.is_empty());
+
+        list.items.push(Todo {
+            text: "First".to_string(),
+            done: false,
+            priority: Priority::High,
+            created_at: 1,
+        });
+        assert_eq!(list.items.len(), 1);
+
+        list.items.push(Todo {
+            text: "Second".to_string(),
+            done: false,
+            priority: Priority::Low,
+            created_at: 2,
+        });
+        assert_eq!(list.items.len(), 2);
+
+        list.items.remove(0);
+        assert_eq!(list.items.len(), 1);
+        assert_eq!(list.items[0].text, "Second");
+    }
+}

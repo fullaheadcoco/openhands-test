@@ -633,7 +633,9 @@ fn ui(f: &mut Frame, app: &App) {
         }
         InputMode::Tagging(_) => {
             let input = Paragraph::new(app.input.as_str())
-                .block(Block::bordered().title(" Tags (comma-separated, Enter: save, Esc: cancel) "))
+                .block(
+                    Block::bordered().title(" Tags (comma-separated, Enter: save, Esc: cancel) "),
+                )
                 .style(Style::new().fg(Color::Blue));
             f.render_widget(input, chunks[2]);
         }
@@ -716,10 +718,12 @@ mod tests {
         let mut list = TodoList { items: vec![] };
         assert!(list.items.is_empty());
 
-        list.items.push(make_todo("First", Priority::High, false, 1));
+        list.items
+            .push(make_todo("First", Priority::High, false, 1));
         assert_eq!(list.items.len(), 1);
 
-        list.items.push(make_todo("Second", Priority::Low, false, 2));
+        list.items
+            .push(make_todo("Second", Priority::Low, false, 2));
         assert_eq!(list.items.len(), 2);
 
         list.items.remove(0);
@@ -774,13 +778,7 @@ mod tests {
 
     #[test]
     fn test_todo_serde_with_tags() {
-        let todo = make_todo_with_tags(
-            "Test",
-            Priority::High,
-            false,
-            100,
-            vec!["bug".to_string()],
-        );
+        let todo = make_todo_with_tags("Test", Priority::High, false, 100, vec!["bug".to_string()]);
         let json = serde_json::to_string(&todo).unwrap();
         let parsed: Todo = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.tags.len(), 1);
@@ -1127,6 +1125,7 @@ mod tests {
 
     #[test]
     fn test_move_selection_empty() {
+        let _ = std::fs::remove_file(SAVE_FILE);
         let mut app = App::new();
         app.move_selection(1);
         assert!(app.filtered_indices.is_empty());
@@ -1149,6 +1148,7 @@ mod tests {
 
     #[test]
     fn test_app_new() {
+        let _ = std::fs::remove_file(SAVE_FILE);
         let app = App::new();
         assert!(app.todos.items.is_empty());
         assert!(app.should_quit == false);
